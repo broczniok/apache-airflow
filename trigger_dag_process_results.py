@@ -1,6 +1,7 @@
 from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.operators.bash import BashOperator
 from airflow.operators.subdag import SubDagOperator
+from airflow.operators.empty import EmptyOperator
 from airflow import DAG, task
 from datetime import datetime, timedelta
 import logging
@@ -30,10 +31,10 @@ def tasks_sub_dag(parent_dag_name, child_dag_name, start_date, schedule_interval
     @subdag.task(task_id='print_results_task', queue='jobs_dag', dag=subdag, multiple_outputs=True)
     def print_results(**kwargs):
         ti = kwargs['ti']
-        result = ti.xcom_pull(key='push_message', dag_id='dag_id_1', include_prior_dates=True)
+        result = ti.xcom_pull(key='push_message', dag_id='dag_id_1', task_ids='Trigger_DAG', include_prior_dates=True)
         print(f"Result from triggered DAG: {result}")
-        #print(f"Task context: {kwargs}")
-        return {"result": result, "context": kwargs}
+        print(f"Task context: {kwargs}")
+        #return {"result": result, "context": kwargs}
 
     dag_sensor_task = ExternalTaskSensor(
         task_id='sensor_triggered_dag',
@@ -43,6 +44,7 @@ def tasks_sub_dag(parent_dag_name, child_dag_name, start_date, schedule_interval
         mode='poke',
         queue='jobs_dag',
         allowed_states=['success'],
+        failed_states=['failed', 'skipped'],
         poke_interval=60,
         timeout=600,
         dag=subdag
@@ -73,6 +75,9 @@ with DAG(
         start_date=datetime(2024, 6, 29),
         catchup=False
 ) as dag:
+
+    task_1 = EmptyOperator(task_id='task1')
+
     sub_dag_task = SubDagOperator(
         task_id='sub_dag',
         subdag=tasks_sub_dag(
@@ -84,3 +89,5 @@ with DAG(
         queue='jobs_dag',
         dag=dag
     )
+
+    task_1 >> sub_dag_task

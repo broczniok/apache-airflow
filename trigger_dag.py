@@ -11,10 +11,10 @@ EXECUTION_DATE = datetime.now(pytz.utc)
 
 def get_time(context):
     ti = context['task_instance']
-    start_time = ti.start_date
+    start_time = context['execution_date']
     print("start time:", start_time)
     ti.xcom_push(key='start_time', value=start_time.isoformat())
-    result = ti.xcom_pull(key='start_time', task_ids='Trigger_DAG')
+    #result = ti.xcom_pull(key='start_time', task_ids='Trigger_DAG')
 
 
 
