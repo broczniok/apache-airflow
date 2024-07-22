@@ -5,7 +5,6 @@ from airflow.operators.empty import EmptyOperator
 from airflow import DAG, task
 from datetime import datetime, timedelta
 import logging
-from trigger_dag import EXECUTION_DATE
 
 default_args = {
     'owner': 'airflow',
@@ -34,7 +33,6 @@ def tasks_sub_dag(parent_dag_name, child_dag_name, start_date, schedule_interval
         result = ti.xcom_pull(key='push_message', dag_id='dag_id_1', task_ids='Trigger_DAG', include_prior_dates=True)
         print(f"Result from triggered DAG: {result}")
         print(f"Task context: {kwargs}")
-        #return {"result": result, "context": kwargs}
 
     dag_sensor_task = ExternalTaskSensor(
         task_id='sensor_triggered_dag',

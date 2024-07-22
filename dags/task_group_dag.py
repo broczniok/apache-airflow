@@ -49,20 +49,21 @@ def tasks_sub_dag(parent_dag_name, child_dag_name, start_date, schedule_interval
     return subdag
 
 
-with DAG(dag_id="task_group_dag", start_date=days_ago(1), schedule_interval='@daily', default_args=default_args, catchup=False) as dag:
+with DAG(dag_id="task_group_dag", start_date=days_ago(1), schedule_interval='@daily', default_args=default_args, concurrency=10, catchup=False) as dag:
     start = EmptyOperator(task_id="start")
 
     with TaskGroup("section_1", tooltip="Tasks for Section 1") as section_1:
         create_section()
 
+    sub_dag_var = tasks_sub_dag(
+        parent_dag_name='task_group_dag',
+        child_dag_name='sub_dag',
+        start_date=days_ago(1),
+        schedule_interval=None)
+
     sub_dag_task = SubDagOperator(
         task_id='sub_dag',
-        subdag=tasks_sub_dag(
-            parent_dag_name='task_group_dag',
-            child_dag_name='sub_dag',
-            start_date=days_ago(1),
-            schedule_interval='@daily'
-        ),
+        subdag=sub_dag_var,
         queue='jobs_dag'
     )
 

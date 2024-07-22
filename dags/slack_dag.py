@@ -16,6 +16,7 @@ default_args = {
     'email_on_retry': False
 }
 
+
 def slack_message():
     try:
         response = client.chat_postMessage(
@@ -25,6 +26,7 @@ def slack_message():
     except SlackApiError as e:
         print(f"Error posting message: {e.response['error']}")
         raise
+
 
 with DAG(dag_id='slack_dag',
          default_args=default_args,
