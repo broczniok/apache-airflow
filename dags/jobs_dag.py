@@ -48,22 +48,23 @@ config = {
     'dag_id_3': {'schedule_interval': "@hourly", "start_date": datetime(2024, 7, 3), 'table_name': "table_name_3"}
 }
 
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False
+}
+
 for conf_name, conf in config.items():
-    default_args = {
-        'owner': 'airflow',
-        'depends_on_past': False,
-        'email_on_failure': False,
-        'email_on_retry': False
-    }
     with DAG(dag_id=conf_name,
              default_args=default_args,
              schedule_interval=conf['schedule_interval'],
              start_date=conf['start_date'],
              catchup=False) as dag:
 
-        task_1 = PythonOperator(task_id='print_process_start', python_callable=start_processing, op_kwargs={'dag_id': conf_name, 'table_name': conf['table_name']}, queue='jobs_dag', dag=dag)
-        task_branch = BranchPythonOperator(task_id='check_table_exists', python_callable=check_table_existence, op_kwargs={'table_name': conf['table_name']}, provide_context=True, queue='jobs_dag', dag=dag)
-        task_2v2 = SQLExecuteQueryOperator(
+        print_process_start = PythonOperator(task_id='print_process_start', python_callable=start_processing, op_kwargs={'dag_id': conf_name, 'table_name': conf['table_name']}, queue='jobs_dag', )
+        task_branch = BranchPythonOperator(task_id='check_table_exists', python_callable=check_table_existence, op_kwargs={'table_name': conf['table_name']}, provide_context=True, queue='jobs_dag', )
+        insert_row = SQLExecuteQueryOperator(
             task_id='insert_rowv2',
             sql="""
                 INSERT INTO table_name VALUES
@@ -77,22 +78,21 @@ for conf_name, conf in config.items():
             },
             queue='jobs_dag'
         )
-        task_3 = PythonOperator(task_id='push_message', python_callable=push_message, trigger_rule=TriggerRule.NONE_FAILED, queue='jobs_dag', dag=dag)
-        task_4v2 = SQLExecuteQueryOperator(task_id='create_tablev2', sql="""
+        push_message = PythonOperator(task_id='push_message', python_callable=push_message, trigger_rule=TriggerRule.NONE_FAILED, queue='jobs_dag' )
+        create_table = SQLExecuteQueryOperator(task_id='create_tablev2', sql="""
             CREATE TABLE table_name(custom_id integer NOT NULL, 
    user_name VARCHAR (50) NOT NULL, timestamp TIMESTAMP NOT NULL); 
           """, trigger_rule=TriggerRule.ONE_FAILED, conn_id=POSTGRES_CONN_ID, queue='jobs_dag')
-        task_5 = BashOperator(task_id='get_current_user', bash_command='whoami', do_xcom_push=True, queue='jobs_dag')
-        task_6 = PostgreSQLCountRows(
+        get_current_user = BashOperator(task_id='get_current_user', bash_command='whoami', do_xcom_push=True, queue='jobs_dag')
+        query_table = PostgreSQLCountRows(
             task_id='query_table',
             table_name='table_name',
             conn_id='my_postgres_conn',
             do_xcom_push=True,
-            dag=dag,
             queue='jobs_dag'
         )
-        task_1 >> task_5 >> task_branch >> task_2v2 >> task_3 >> task_6
-        task_branch >> task_4v2 >> task_2v2
+        print_process_start >> get_current_user >> task_branch >> insert_row >> push_message >> query_table
+        task_branch >> create_table >> insert_row
 
 
         globals()[conf_name] = dag
